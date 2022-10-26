@@ -27,20 +27,18 @@ with DAG(
 ):
 
     for schema in schemas:
-        schema_name = schema
 
         with TaskGroup(
-            group_id=f"{schema_name}"
+            group_id=schema
         ) as schema_tg:
             
             tables = schemas[schema]["tables"]
             table_objects = {}
 
             for table in tables:
-                table_name = table
 
                 with TaskGroup(
-                    group_id=f"{table_name}",
+                    group_id=table,
                     default_args={
                         "conn_id": "snowflake_conn",
                         "trigger_rule": "all_done"
@@ -53,8 +51,8 @@ with DAG(
                         sql=TABLE_SCHEMA_CHECK,
                         params={
                             "db_to_query": db_to_query,
-                            "schema": schema_name,
-                            "table": table_name,
+                            "schema": schema,
+                            "table": table,
                             "col_list": tables[table]["col_list"]
                         }
                     )
@@ -62,14 +60,14 @@ with DAG(
                     # run a list of checks on individual columns
                     column_checks = SQLColumnCheckOperator(
                         task_id="column_checks",
-                        table=f"{db_to_query}.{schema_name}.{table_name}",
+                        table=f"{db_to_query}.{schema}.{table}",
                         column_mapping=tables[table]["column_mapping"]
                     )
                 
                     # run a list of checks on the whole SQL table
                     table_checks = SQLTableCheckOperator(
                         task_id="table_checks",
-                        table=f"{db_to_query}.{schema_name}.{table_name}",
+                        table=f"{db_to_query}.{schema}.{table}",
                         checks=tables[table]["table_checks"]
                     )
 
@@ -81,15 +79,16 @@ with DAG(
                         custom_checks = tables[table]["custom_checks"]
                         for custom_check in custom_checks:
                             custom_check_task = SQLCheckOperator(
-                                    task_id="custom_check_task",
-                                    sql=custom_checks[custom_check]["custom_sql"],
-                            params=custom_checks[custom_check]["custom_params"]
+                                task_id="custom_check_task",
+                                sql=custom_checks[custom_check]["custom_sql"],
+                                params=custom_checks[custom_check]["custom_params"]
                             )
 
                             schema_change_check >> custom_check_task
 
-                    table_objects[table_name] = table_tg
+                    table_objects[table] = table_tg
 
+        # set dependencies between table-level task groups
         set_dependencies(
             table_objects,
             schemas[schema]["definition_of_dependencies"]
