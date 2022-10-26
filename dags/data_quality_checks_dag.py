@@ -38,9 +38,7 @@ with DAG(
                     "null_check": {"equal_to": 0}
                 },
                 "date": {
-                    "null_check": {"equal_to": 0},
-                    "min": {"greater_than": date(2022, 5, 1)},
-                    "max": {"leq_to": date.today()}
+                    "null_check": {"equal_to": 0}
                 },
                 "dag_runs": {
                     "null_check": {"equal_to": 0},
@@ -90,6 +88,10 @@ with DAG(
                 },
                 "dagrun_sum_check": {
                     "check_statement": "SUM(DAG_RUNS) > 0"
+                },
+                "date_in_bounds_check": {
+                    "check_statement": "DATE BETWEEN '2022-05-01' AND \
+                        SYSDATE()"
                 }
             }
         )
@@ -110,14 +112,6 @@ with DAG(
                 },
                 "is_active": {
                     "null_check": {"equal_to": 0}
-                },
-                "date_activated": {
-                    "min": {"greater_than": date(2022, 5, 1)},
-                    "max": {"leq_to": date.today()}
-                },
-                "date_churn": {
-                    "min": {"greater_than": date(2022, 5, 1)},
-                    "max": {"leq_to": date.today()}
                 },
                 "active_deployments": {
                     "null_check": {"equal_to": 0},
@@ -141,41 +135,16 @@ with DAG(
                 "total_deployments_check": {
                     "check_statement": "SUM(active_deployments) < 1000"
                 },
+                "date_activated_in_bounds_check": {
+                    "check_statement": "date_activated is null OR \
+                        date_activated BETWEEN '2022-05-01' AND SYSDATE()"
+                },
+                "date_churn_in_bounds_check": {
+                    "check_statement": "date_churn is null OR date_churn \
+                        BETWEEN '2022-05-01' AND SYSDATE()"
+                }   
             }
         )
-
-        # WIP partition_clause statement
-        """table_checks_active = SQLTableCheckOperator(
-            task_id="table_checks_table_2_active",
-            table="table_2",
-            partition_clause="'IS_ACTIVE' = TRUE",
-            checks={
-                "at_least_one_active_check": {
-                    "check_statement": "COUNT(*) > 0"
-                },
-                "active_customers_have_activation_date_check": {
-                    "check_statement": "date_activated IS NOT NULL"
-                },
-                "active_customers_have_not_churn_date_check": {
-                    "check_statement": "date_churn IS NULL"
-                },
-                "active_customers_have_at_least_one_active_deployment_check": {
-                    "check_statement": "active_deployments > 0"
-                }
-            }
-        )
-
-        table_checks_inactive = SQLTableCheckOperator(
-            task_id="table_checks_table_2_inactive",
-            table="table_2",
-            partition_clause="'IS_ACTIVE' = FALSE",
-            checks={
-                "inactive_customers_no_deployment_check": {
-                    "check_statement": "active_deployments = 0"
-                }
-            }
-        )"""
-
 
         column_checks >> [
             table_checks_general
