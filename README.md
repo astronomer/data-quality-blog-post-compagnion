@@ -3,7 +3,7 @@ Overview
 
 > If you are unfamiliar with Airflow or the Astro CLI start with [this tutorial](https://docs.astronomer.io/tutorials/get-started-with-airflow).
 
-Welcome! This repository contains an examples for data quality checks running on two tables created by two different DAGs.
+Welcome! This repository contains examples for data quality checks running on two tables created by two different DAGs.
 
 To run the repository you will need to configure a Snowflake connection. With at least the following:
 
@@ -16,6 +16,8 @@ To run the repository you will need to configure a Snowflake connection. With at
 - login: your Snowflake login
 - password: your Snowflake password
 - location: your Snowflake location (e.g. us-east-01)
+
+You will also need to provide the name of your database on line 14 of the `data_quality_checks_dag` and the name of your schema on line 1 in the checks.py file in the `/include` folder.
 
 The repository contains 3 dags in the dags folder. `create_table_1_dag` will create `table_1` in Snowflake, `create_table_2_dag` will create `table_2`. `create_table_2_dag` is triggered once `create_table_1_dag` has completed and `data_quality_checks_dag` is triggered once the both two dags have been completed (see: [Datasets and Data-Aware Scheduling in Airflow](https://www.astronomer.io/guides/airflow-datasets/)) and will run a set of data quality checks on both tables. All checks are set up to pass.
 

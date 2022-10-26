@@ -5,149 +5,92 @@ from airflow.operators.empty import EmptyOperator
 from airflow.providers.common.sql.operators.sql import (
     SQLColumnCheckOperator, SQLTableCheckOperator
 )
+from airflow.operators.sql import SQLCheckOperator
+from include.checks import schemas, TABLE_SCHEMA_CHECK
 
 dataset_table_1 = Dataset('snowflake://table_1')
 dataset_table_2 = Dataset('snowflake://table_2')
+
+db_to_query = "SANDBOX"
+
+def set_dependencies(table_objects, definition_of_dependencies):
+	for up, down in definition_of_dependencies.items():
+		if down:
+			for downstream_table in down:
+				table_objects[up] >> table_objects[downstream_table]
 
 with DAG(
     dag_id="data_quality_checks_dag",
     start_date=datetime(2022, 9, 27),
     schedule=[dataset_table_1, dataset_table_2],
-    catchup=False,
-    default_args={
-        "conn_id" : "snowflake_conn"
-    }
+    catchup=False
 ):
 
-    start = EmptyOperator(task_id="start")
-    end = EmptyOperator(task_id="end")
+    for schema in schemas:
+        schema_name = schema
 
-    with TaskGroup(
-        group_id="checking_table_1"
-    ) as checking_table_1:
+        with TaskGroup(
+            group_id=f"{schema_name}"
+        ) as schema_tg:
+            
+            tables = schemas[schema]["tables"]
+            table_objects = {}
 
-        column_checks = SQLColumnCheckOperator(
-            task_id="columns_checks_table_1",
-            table="table_1",
-            column_mapping={
-                "customer_date_id": {
-                    "null_check": {"equal_to": 0},
-                    "unique_check": {"equal_to": 0}
-                },
-                "customer_id": {
-                    "null_check": {"equal_to": 0}
-                },
-                "date": {
-                    "null_check": {"equal_to": 0}
-                },
-                "dag_runs": {
-                    "null_check": {"equal_to": 0},
-                    "min": {"geq_to": 0},
-                    "max": {"leq_to": 100}
-                },
-                "successful_tasks": {
-                    "null_check": {"equal_to": 0},
-                    "min": {"geq_to": 0},
-                    "max": {"leq_to": 100_000}
-                },
-                "failed_tasks": {
-                    "null_check": {"equal_to": 0},
-                    "min": {"geq_to": 0},
-                    "max": {"leq_to": 100}
-                },
-                "total_tasks": {
-                    "null_check": {"equal_to": 0},
-                    "min": {"geq_to": 0},
-                    "max": {"leq_to": 100_100}
-                },
-                "success_rate": {
-                    "null_check": {"equal_to": 0},
-                    "min": {"geq_to": 0},
-                    "max": {"leq_to": 1}
-                }
-            }
+            for table in tables:
+                table_name = table
+
+                with TaskGroup(
+                    group_id=f"{table_name}",
+                    default_args={
+                        "conn_id": "snowflake_conn",
+                        "trigger_rule": "all_done"
+                    }
+                ) as table_tg:
+
+                    # check if there were any changes to the table schema
+                    schema_change_check = SQLCheckOperator(
+                        task_id="schema_change_check",
+                        sql=TABLE_SCHEMA_CHECK,
+                        params={
+                            "db_to_query": db_to_query,
+                            "schema": schema_name,
+                            "table": table_name,
+                            "col_list": tables[table]["col_list"]
+                        }
+                    )
+	
+                    # run a list of checks on individual columns
+                    column_checks = SQLColumnCheckOperator(
+                        task_id="column_checks",
+                        table=f"{db_to_query}.{schema_name}.{table_name}",
+                        column_mapping=tables[table]["column_mapping"]
+                    )
+                
+                    # run a list of checks on the whole SQL table
+                    table_checks = SQLTableCheckOperator(
+                        task_id="table_checks",
+                        table=f"{db_to_query}.{schema_name}.{table_name}",
+                        checks=tables[table]["table_checks"]
+                    )
+
+                    # set dependencies of the checks
+                    schema_change_check >> [column_checks, table_checks]
+
+                    # if defined create custom checks
+                    if tables[table]["custom_checks"]:
+                        custom_checks = tables[table]["custom_checks"]
+                        for custom_check in custom_checks:
+                            custom_check_task = SQLCheckOperator(
+                                    task_id="custom_check_task",
+                                    sql=custom_checks[custom_check]["custom_sql"],
+                            params=custom_checks[custom_check]["custom_params"]
+                            )
+
+                            schema_change_check >> custom_check_task
+
+                    table_objects[table_name] = table_tg
+
+        set_dependencies(
+            table_objects,
+            schemas[schema]["definition_of_dependencies"]
         )
-
-        table_checks = SQLTableCheckOperator(
-            task_id="table_checks_table_1",
-            table="table_1",
-            checks={
-                "row_count_check": {
-                    "check_statement": "COUNT(*) > 0"
-                },
-                "task_total_greater_dag_total_check": {
-                    "check_statement": "TOTAL_TASKS > DAG_RUNS"
-                },
-                "task_total_success_plus_failed_check": {
-                    "check_statement": "SUCCESSFUL_TASKS + FAILED_TASKS = \
-                        TOTAL_TASKS"
-                }, 
-                "success_rate_check": {
-                    "check_statement": "SUCCESSFUL_TASKS/TOTAL_TASKS = \
-                        SUCCESS_RATE"
-                },
-                "dagrun_sum_check": {
-                    "check_statement": "SUM(DAG_RUNS) > 0"
-                },
-                "date_in_bounds_check": {
-                    "check_statement": "DATE BETWEEN '2022-05-01' AND \
-                        SYSDATE()"
-                }
-            }
-        )
-
-        column_checks >> table_checks
-
-    with TaskGroup(
-        group_id="checking_table_2"
-    ) as checking_table_2:
-
-        column_checks = SQLColumnCheckOperator(
-            task_id="columns_checks_table_2",
-            table="table_2",
-            column_mapping={
-                "customer_id": {
-                    "null_check": {"equal_to": 0},
-                    "unique_check": {"equal_to": 0}
-                },
-                "is_active": {
-                    "null_check": {"equal_to": 0}
-                },
-                "active_deployments": {
-                    "null_check": {"equal_to": 0},
-                    "min": {"geq_to": 0},
-                    "max": {"leq_to": 100}
-                }
-            }
-        )
-
-        table_checks_general = SQLTableCheckOperator(
-            task_id="table_checks_table_2_general",
-            table="table_2",
-            checks={
-                "row_count_check": {
-                    "check_statement": "COUNT(*) > 0"
-                },
-                "active_before_churn": {
-                    "check_statement": "date_churn IS NULL OR \
-                        (date_activated < date_churn)"
-                },
-                "total_deployments_check": {
-                    "check_statement": "SUM(active_deployments) < 1000"
-                },
-                "date_activated_in_bounds_check": {
-                    "check_statement": "date_activated is null OR \
-                        date_activated BETWEEN '2022-05-01' AND SYSDATE()"
-                },
-                "date_churn_in_bounds_check": {
-                    "check_statement": "date_churn is null OR date_churn \
-                        BETWEEN '2022-05-01' AND SYSDATE()"
-                }   
-            }
-        )
-
-        column_checks >> [
-            table_checks_general
-        ]
-
-    start >> [checking_table_1, checking_table_2] >> end
