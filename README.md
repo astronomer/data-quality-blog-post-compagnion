@@ -15,7 +15,7 @@ To run the repository you will need to configure a Snowflake connection. With at
 - schema: your Snowflake schema
 - login: your Snowflake login
 - password: your Snowflake password
-- region: your Snowflake location (e.g. us-east-01)
+- region: your Snowflake region (e.g. us-east-01)
 
 You will also need to:
 
