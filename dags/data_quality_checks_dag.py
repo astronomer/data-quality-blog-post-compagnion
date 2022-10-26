@@ -1,7 +1,6 @@
 from airflow import DAG, Dataset
 from airflow.utils.task_group import TaskGroup
-from datetime import datetime, date
-from airflow.operators.empty import EmptyOperator
+from datetime import datetime
 from airflow.providers.common.sql.operators.sql import (
     SQLColumnCheckOperator, SQLTableCheckOperator
 )
@@ -13,11 +12,13 @@ dataset_table_2 = Dataset('snowflake://table_2')
 
 db_to_query = "SANDBOX"
 
+
 def set_dependencies(table_objects, definition_of_dependencies):
-	for up, down in definition_of_dependencies.items():
-		if down:
-			for downstream_table in down:
-				table_objects[up] >> table_objects[downstream_table]
+    for up, down in definition_of_dependencies.items():
+        if down:
+            for downstream_table in down:
+                table_objects[up] >> table_objects[downstream_table]
+
 
 with DAG(
     dag_id="data_quality_checks_dag",
@@ -31,7 +32,7 @@ with DAG(
         with TaskGroup(
             group_id=schema
         ) as schema_tg:
-            
+
             tables = schemas[schema]["tables"]
             table_objects = {}
 
@@ -56,14 +57,14 @@ with DAG(
                             "col_list": tables[table]["col_list"]
                         }
                     )
-	
+
                     # run a list of checks on individual columns
                     column_checks = SQLColumnCheckOperator(
                         task_id="column_checks",
                         table=f"{db_to_query}.{schema}.{table}",
                         column_mapping=tables[table]["column_mapping"]
                     )
-                
+
                     # run a list of checks on the whole SQL table
                     table_checks = SQLTableCheckOperator(
                         task_id="table_checks",
@@ -80,8 +81,8 @@ with DAG(
                         for custom_check in custom_checks:
                             custom_check_task = SQLCheckOperator(
                                 task_id="custom_check_task",
-                                sql=custom_checks[custom_check]["custom_sql"],
-                                params=custom_checks[custom_check]["custom_params"]
+                                sql=custom_checks[custom_check]["sql"],
+                                params=custom_checks[custom_check]["params"]
                             )
 
                             schema_change_check >> custom_check_task

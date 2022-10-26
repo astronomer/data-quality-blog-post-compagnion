@@ -5,8 +5,8 @@ schemas = {
         "tables": {
             "TABLE_1": {
                 "col_list": """[
-                    "CUSTOMER_DATE_ID", "CUSTOMER_ID", "DATE", "DAG_RUNS", 
-                    "SUCCESSFUL_TASKS", "FAILED_TASKS", "TOTAL_TASKS", 
+                    "CUSTOMER_DATE_ID", "CUSTOMER_ID", "DATE", "DAG_RUNS",
+                    "SUCCESSFUL_TASKS", "FAILED_TASKS", "TOTAL_TASKS",
                     "SUCCESS_RATE"
                     ]""",
                 "column_mapping": {
@@ -56,7 +56,7 @@ schemas = {
                     "task_total_success_plus_failed_check": {
                         "check_statement": "SUCCESSFUL_TASKS + FAILED_TASKS = \
                             TOTAL_TASKS"
-                    }, 
+                    },
                     "success_rate_check": {
                         "check_statement": "SUCCESSFUL_TASKS/TOTAL_TASKS = \
                             SUCCESS_RATE"
@@ -73,7 +73,7 @@ schemas = {
             },
             "TABLE_2": {
                 "col_list": """[
-                    "CUSTOMER_ID", "IS_ACTIVE", "DATE_ACTIVATED", 
+                    "CUSTOMER_ID", "IS_ACTIVE", "DATE_ACTIVATED",
                     "DATE_CHURN", "ACTIVE_DEPLOYMENTS"
                     ]""",
                 "column_mapping": {
@@ -108,12 +108,12 @@ schemas = {
                     "date_churn_in_bounds_check": {
                         "check_statement": "date_churn is null OR date_churn \
                             BETWEEN '2022-05-01' AND SYSDATE()"
-                    }   
+                    }
                 },
                 "custom_checks": []
             }
         },
-        "definition_of_dependencies" : {
+        "definition_of_dependencies": {
             "TABLE_1": ["TABLE_2"],
             "TABLE_2": []
         }

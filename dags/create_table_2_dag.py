@@ -1,6 +1,6 @@
 from airflow import DAG, Dataset
 from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
-from datetime import datetime 
+from datetime import datetime
 
 dataset_table_1 = Dataset('snowflake://table_1')
 dataset_table_2 = Dataset('snowflake://table_2')
