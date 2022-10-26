@@ -1,4 +1,4 @@
-MY_SCHEMA = "TAMARAFINGERLIN"
+MY_SCHEMA = "MYSCHEMA"
 
 schemas = {
     f"{MY_SCHEMA}": {
